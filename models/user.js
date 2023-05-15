@@ -1,8 +1,10 @@
 "use strict";
 
-const { NotFoundError } = require("../expressError");
+const { NotFoundError,
+  UnauthorizedError } = require("../expressError");
 const db = require("../db");
 const bcrypt = require("bcrypt");
+const { BCRYPT_WORK_FACTOR } = require("../config")
 
 
 /** User of the site. */
@@ -14,8 +16,7 @@ class User {
    */
 
   static async register({ username, password, first_name, last_name, phone }) {
-    const hashedPassword = await bcrypt.hash(password, 12);
-    // console.log('\n hashed password =>', hashedPassword, '\n');
+    const hashedPassword = await bcrypt.hash(password, BCRYPT_WORK_FACTOR);
 
     const result = await db.query(
       `INSERT INTO users (username,
@@ -46,10 +47,11 @@ class User {
 
     const user = result.rows[0];
 
+
     if (user) {
-      return await bcrypt.compare(password, user.password);
+      return await bcrypt.compare(password, user.password) === true;
     } else {
-      throw NotFoundError();
+      throw new UnauthorizedError();
     }
 
 
@@ -63,6 +65,10 @@ class User {
        SET last_login_at = current_timestamp
          WHERE username = $1`,
       [username]);
+
+    if (!result) {
+      throw new NotFoundError();
+    }
   }
 
   /** All: basic info on all users:
@@ -71,8 +77,8 @@ class User {
   static async all() {
     const result = await db.query(
       `SELECT username, first_name, last_name
-      FROM users`
-    )
+      FROM users
+      ORDER BY last_name`)
 
     return result.rows
   }
@@ -101,6 +107,9 @@ class User {
 
     let singleUser = result.rows[0];
 
+    // if no user is found with this username throw not found error
+    if (!singleUser) throw new NotFoundError();
+
     return singleUser;
   }
 
@@ -114,10 +123,6 @@ class User {
   static async messagesFrom(username) {
     const result = await db.query(
       `SELECT m.id,
-                  m.from_username,
-                  f.first_name AS from_first_name,
-                  f.last_name AS from_last_name,
-                  f.phone AS from_phone,
                   m.to_username,
                   t.first_name AS to_first_name,
                   t.last_name AS to_last_name,
@@ -126,26 +131,25 @@ class User {
                   m.sent_at,
                   m.read_at
              FROM messages AS m
-                    JOIN users AS f ON m.from_username = f.username
                     JOIN users AS t ON m.to_username = t.username
              WHERE m.from_username = $1`,
       [username])
 
-    const msgsFrom = result.rows[0];
-    console.log('\n msgsFrom =>', msgsFrom, '\n');
+    const allMessagesFromUser = result.rows.map(msg => (
+      {
+        id: msg.id,
+        to_user: {
+          username: msg.to_username,
+          first_name: msg.to_first_name,
+          last_name: msg.to_last_name,
+          phone: msg.to_phone
+        },
+        body: msg.body,
+        sent_at: msg.sent_at,
+        read_at: msg.read_at
+      }));
 
-    return [{
-      id: msgsFrom.id,
-      to_user: {
-        username: msgsFrom.to_username,
-        first_name: msgsFrom.to_first_name,
-        last_name: msgsFrom.to_last_name,
-        phone: msgsFrom.to_phone
-      },
-      body: msgsFrom.body,
-      sent_at: msgsFrom.sent_at,
-      read_at: msgsFrom.read_at
-    }]
+    return allMessagesFromUser;
   }
 
   /** Return messages to this user.
@@ -163,34 +167,30 @@ class User {
                   f.first_name AS from_first_name,
                   f.last_name AS from_last_name,
                   f.phone AS from_phone,
-                  m.to_username,
-                  t.first_name AS to_first_name,
-                  t.last_name AS to_last_name,
-                  t.phone AS to_phone,
                   m.body,
                   m.sent_at,
                   m.read_at
              FROM messages AS m
                     JOIN users AS f ON m.from_username = f.username
-                    JOIN users AS t ON m.to_username = t.username
              WHERE m.to_username = $1`,
       [username])
 
-    const msgs = result.rows[0];
-    console.log('\n msgs =>', msgs, '\n');
+    const allMessagesToUser = result.rows.map(msg => (
+      {
+        id: msg.id,
+        from_user: {
+          username: msg.from_username,
+          first_name: msg.from_first_name,
+          last_name: msg.from_last_name,
+          phone: msg.from_phone
+        },
+        body: msg.body,
+        sent_at: msg.sent_at,
+        read_at: msg.read_at
+      }
+    ));
 
-    return [{
-      id: msgs.id,
-      from_user: {
-        username: msgs.from_username,
-        first_name: msgs.from_first_name,
-        last_name: msgs.from_last_name,
-        phone: msgs.from_phone
-      },
-      body: msgs.body,
-      sent_at: msgs.sent_at,
-      read_at: msgs.read_at
-    }]
+    return allMessagesToUser;
   }
 }
 
