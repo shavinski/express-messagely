@@ -6,7 +6,8 @@ const jwt = require("jsonwebtoken");
 
 const { SECRET_KEY } = require("../config");
 const Message = require("../models/message");
-const { ensureLoggedIn, ensureCorrectUser } = require("../middleware/auth")
+const { ensureLoggedIn, ensureCorrectUser } = require("../middleware/auth");
+const { UnauthorizedError } = require("../expressError");
 
 
 /** GET /:id - get detail of message.
@@ -22,24 +23,18 @@ const { ensureLoggedIn, ensureCorrectUser } = require("../middleware/auth")
  *
  **/
 
-router.get(
-    '/:id',
-    ensureLoggedIn,
+router.get('/:id', ensureLoggedIn, async function (req, res, next) {
+    const username = res.locals.user.username;
+    const id = req.params.id;
+    const message = await Message.get(id);
 
-    async function (req, res, next) {
-        //FIXME: make sure person who logged in is the person who wrote the message 
-        // or the person it was sent to 
-        let username = res.locals.user.username;
+    if (username !== message.to_username
+        && message.from_user.username !== username) {
+        throw new UnauthorizedError()
+    }
 
-        console.log(username);
-
-
-
-        const id = req.params.id;
-        const message = await Message.get(id);
-
-        return res.json({ message });
-    })
+    return res.json({ message });
+})
 
 
 /** POST / - post message.
@@ -48,16 +43,11 @@ router.get(
  *   {message: {id, from_username, to_username, body, sent_at}}
  *
  **/
-router.post(
-    '/',
+router.post('/', ensureLoggedIn, async function (req, res, next) {
+    const message = await Message.create(req.body);
 
-    ensureLoggedIn,
-
-    async function (req, res, next) {
-        const message = await Message.create(req.body);
-
-        return res.json({ message });
-    })
+    return res.json({ message });
+})
 
 
 /** POST/:id/read - mark message as read:
@@ -67,20 +57,19 @@ router.post(
  * Makes sure that the only the intended recipient can mark as read.
  *
  **/
-router.post(
-    '/:id/read',
+router.post('/:id/read', ensureLoggedIn, async function (req, res, next) {
+    const username = res.locals.user.username;
+    const id = req.params.id;
+    const msg = await Message.get(id);
 
-    ensureLoggedIn,
+    if (username !== msg.to_user.username) {
+        throw new UnauthorizedError("You are not allowed to view this message")
+    }
 
-    async function (req, res, next) {
-        //FIXME: only the person who was sent the message can mark as read
-        // the to user, if not reject and sent unauth error 
+    const message = await Message.markRead(id);
 
-        const id = req.params.id;
-        const message = await Message.markRead(id);
-
-        return res.json({ message });
-    })
+    return res.json({ message });
+})
 
 
 module.exports = router;
