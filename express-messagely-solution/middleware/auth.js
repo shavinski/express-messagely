@@ -18,7 +18,6 @@ function authenticateJWT(req, res, next) {
     return next();
   } catch (err) {
     // error in this middleware isn't error -- continue on
-    console.log(err.message);
     return next();
   }
 }
@@ -36,9 +35,6 @@ function ensureLoggedIn(req, res, next) {
 function ensureCorrectUser(req, res, next) {
   const currentUser = res.locals.user;
   const hasUnauthorizedUsername = currentUser?.username !== req.params.username;
-  console.log('\n req params', req.params);
-  console.log("\n cur user =>", currentUser);
-  console.log("\n has unauth username =>", hasUnauthorizedUsername, '\n');
 
 if (!currentUser || hasUnauthorizedUsername){
   throw new UnauthorizedError();

@@ -2,15 +2,13 @@
 
 const Router = require("express").Router;
 const router = new Router();
-const User = require("../models/user");
-const { SECRET_KEY } = require("../config");
 const jwt = require("jsonwebtoken");
-const { authenticateJWT,
-    ensureLoggedIn,
-    ensureCorrectUser } = require("../middleware/auth")
 
-    // FIXME: REPLACE ALL OF THE VERIFY TOKENS WITH MIDDLEWARE SUPPLIED TO USE
-    // FIXME: REPLACE ALL REMEMBER JAKOB
+const { SECRET_KEY } = require("../config");
+const User = require("../models/user");
+const { ensureLoggedIn, ensureCorrectUser } = require("../middleware/auth");
+
+
 
 
 /** GET / - get list of users.
@@ -18,14 +16,17 @@ const { authenticateJWT,
  * => {users: [{username, first_name, last_name}, ...]}
  *
  **/
-router.get('/', async function (req, res, next) {
-    const tokenFromQueryString = req.query?.token;
-    jwt.verify(tokenFromQueryString, SECRET_KEY);
+router.get(
+    '/', 
 
-    const users = await User.all();
+    ensureLoggedIn,
 
-    return res.json({ users });
-})
+    async function (req, res, next) {
+
+        const users = await User.all();
+
+        return res.json({ users });
+    })
 
 
 /** GET /:username - get detail of users.
@@ -33,17 +34,18 @@ router.get('/', async function (req, res, next) {
  * => {user: {username, first_name, last_name, phone, join_at, last_login_at}}
  *
  **/
-router.get('/:username', async function (req, res, next) {
-    //FIXME: fix security here so that only the user that is logged in 
-    // can view their own detail but cant view anyone elses
-    const tokenFromQueryString = req.query?.token;
-    jwt.verify(tokenFromQueryString, SECRET_KEY);
+router.get(
+    '/:username',
 
-    const username = req.params.username;
-    const user = await User.get(username);
+    ensureCorrectUser,
 
-    return res.json({ user });
-})
+    async function (req, res, next) {
+
+        const username = req.params.username;
+        const user = await User.get(username);
+
+        return res.json({ user });
+    })
 
 
 /** GET /:username/to - get messages to user
@@ -55,15 +57,19 @@ router.get('/:username', async function (req, res, next) {
  *                 from_user: {username, first_name, last_name, phone}}, ...]}
  *
  **/
-router.get('/:username/to', async function (req, res, next) {
-    const tokenFromQueryString = req.query?.token;
-    jwt.verify(tokenFromQueryString, SECRET_KEY);
+router.get(
+    '/:username/to',
 
-    const username = req.params.username;
-    const messages = await User.messagesTo(username);
+    ensureCorrectUser,
 
-    return res.json({ messages });
-})
+    async function (req, res, next) {
+
+
+        const username = req.params.username;
+        const messages = await User.messagesTo(username);
+
+        return res.json({ messages });
+    })
 
 
 /** GET /:username/from - get messages from user
@@ -75,14 +81,18 @@ router.get('/:username/to', async function (req, res, next) {
  *                 to_user: {username, first_name, last_name, phone}}, ...]}
  *
  **/
-router.get('/:username/from', async function (req, res, next) {
-    const tokenFromQueryString = req.query?.token;
-    jwt.verify(tokenFromQueryString, SECRET_KEY);
+router.get(
+    '/:username/from',
 
-    const username = req.params.username;
-    const messages = await User.messagesFrom(username);
+    ensureCorrectUser,
 
-    return res.json({ messages });
-})
+    async function (req, res, next) {
+
+
+        const username = req.params.username;
+        const messages = await User.messagesFrom(username);
+
+        return res.json({ messages });
+    })
 
 module.exports = router;

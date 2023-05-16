@@ -1,17 +1,14 @@
 "use strict";
 
 const { application } = require("express");
-const { BadRequestError,
-    UnauthorizedError } = require("../expressError");
 const db = require("../db");
 const bcrypt = require("bcrypt");
-const { SECRET_KEY } = require("../config");
 const jwt = require("jsonwebtoken");
-const { authenticateJWT,
-    ensureLoggedIn,
-    ensureCorrectUser } = require("../middleware/auth")
-const User = require("../models/user");
 
+const { BadRequestError, UnauthorizedError } = require("../expressError");
+const { SECRET_KEY } = require("../config");
+const { ensureLoggedIn, ensureCorrectUser } = require("../middleware/auth")
+const User = require("../models/user");
 
 
 const Router = require("express").Router;
@@ -24,9 +21,11 @@ router.post('/login', async function (req, res, next) {
     const { username, password } = req.body;
 
     const user = await User.authenticate(username, password);
-
+    
     if (user) {
         const token = jwt.sign({ username }, SECRET_KEY);
+        console.log("token => \n", token);
+        User.updateLoginTimestamp(username);
         return res.json({ token });
     }
 
@@ -44,7 +43,7 @@ router.post('/register', async function (req, res, next) {
     const user = await User.register(req.body);
 
     if (user) {
-        const token = jwt.sign({ user: user.username }, SECRET_KEY);
+        const token = jwt.sign({ username: user.username }, SECRET_KEY);
         return res.json({ token });
     }
 
