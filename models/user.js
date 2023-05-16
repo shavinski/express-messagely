@@ -47,14 +47,7 @@ class User {
 
     const user = result.rows[0];
 
-
-    if (user) {
-      return await bcrypt.compare(password, user.password) === true;
-    } else {
-      throw new UnauthorizedError();
-    }
-
-
+    return user && await bcrypt.compare(password, user.password) === true ;
   }
 
   /** Update last_login_at for user */
@@ -102,7 +95,6 @@ class User {
                   last_login_at
         FROM users 
         WHERE username = $1`,
-      // RETURNING username, first_name, last_name, phone, join_at, last_login_at`,
       [username]);
 
     let singleUser = result.rows[0];
